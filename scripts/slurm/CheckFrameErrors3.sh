@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=frame_check
-#SBATCH --output=${BASE_DIR}/Orthocaller_Codon_Alignments/FClogs4/framecheck_%A_%a.out
-#SBATCH --error=${BASE_DIR}/Orthocaller_Codon_Alignments/FClogs4/framecheck_%A_%a.err
+#SBATCH --output=logs/frame_check_%A_%a.out
+#SBATCH --error=logs/frame_check_%A_%a.err
 #SBATCH --array=4001-7950
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
@@ -11,20 +11,40 @@
 
 set -euo pipefail
 
-cd ${BASE_DIR}/Orthocaller_Codon_Alignments || exit 1
+############################
+# User configuration
+############################
 
-mkdir -p FClogs4
+BASE_DIR="/path/to/BIGFISHGENOME_DataRespository"
+
+EXTRACTED_DIR="${BASE_DIR}/ExtractOrthocallerResults"
+CODON_DIR="${BASE_DIR}/Orthocaller_Codon_Alignments"
+
+PROTEIN_DATASET="EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5"
+CDS_DATASET="${PROTEIN_DATASET}_CDS"
+
+FRAME_FIXED_DIR="FRAME_FIXED"
+FRAMECHECK_OUTPUT="FrameCheckOutput_May3"
+
+TRANSLATED_DIR="${EXTRACTED_DIR}/${CDS_DATASET}/Translated_Proteins/${FRAME_FIXED_DIR}"
+ORIGINAL_DIR="${EXTRACTED_DIR}/${PROTEIN_DATASET}/ORIGINALSEQS_Unaligned"
+OUT_DIR="${CODON_DIR}/${FRAMECHECK_OUTPUT}"
+
+############################
+# Setup
+############################
+
+cd "${CODON_DIR}" || exit 1
+
+mkdir -p logs
+mkdir -p "${OUT_DIR}"
 
 module load conda
 source activate orthocaller
 
-TRANSLATED_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5_CDS/Translated_Proteins/FRAME_FIXED"
-
-ORIGINAL_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5/ORIGINALSEQS_Unaligned/"
-
-OUT_DIR="${BASE_DIR}/Orthocaller_Codon_Alignments/FrameCheckOutput_May3"
-
-mkdir -p "${OUT_DIR}"
+############################
+# Select file for this array task
+############################
 
 FILE=$(find "${TRANSLATED_DIR}" -maxdepth 1 -type f -name "*.faa_protein.faa" | sort | sed -n "${SLURM_ARRAY_TASK_ID}p")
 
@@ -36,7 +56,11 @@ fi
 echo "Running frame check on:"
 echo "${FILE}"
 
-python3 CheckFrameErrors3.py \
+############################
+# Run frame check
+############################
+
+python3 "${CODON_DIR}/CheckFrameErrors3.py" \
   --translated_dir "${TRANSLATED_DIR}" \
   --original_dir "${ORIGINAL_DIR}" \
   --out_dir "${OUT_DIR}" \

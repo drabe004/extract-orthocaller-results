@@ -3,23 +3,21 @@
 #SBATCH -c 1
 #SBATCH --mem=2G
 #SBATCH -t 04:00:00
-#SBATCH --array=4001-7709
-#SBATCH -o logsMay7/cln_%A_%a.out
-#SBATCH -e logsMay7/cln_%A_%a.err
-#SBACTH -p astyanax,msismall
+#SBATCH --array=1-4000
+#SBATCH -o logs/cln_%A_%a.out
+#SBATCH -e logs/cln_%A_%a.err
 
-cd ${BASE_DIR}/SelectionTests
+cd ${BASE_DIR}/
 
 module load python
-mkdir -p logsMay7
-
+mkdir -p logs
 
 ###This script deletes stop codons and the rest of the header information from the sequences bc hyphy and other programs won't tolerate those things. Header backup CSVs are written as a quick reference to the header information that was truncated each species
 
 python cln.py \
-  --indir ${BASE_DIR}/Orthocaller_Codon_Alignments/PAL2NAL_alns_V8_ShortestDist_NoBranchReassignments_SIFTED_May7/ \
-  --outdir ${BASE_DIR}/Orthocaller_Codon_Alignments/PAL2NAL_alns_V8_ShortestDist_NoBranchReassignments_SIFTED_May7_cleanedforSelTestsNoStopCodons/ \
-  --backupdir ${BASE_DIR}/Orthocaller_Codon_Alignments/PAL2NAL_alns_V8_ShortestDist_NoBranchReassignments_SIFTED_May7_cleanedforSelTestsNoStopCodons/header_backups \
+  --indir ${BASE_DIR}/Sifted_Codon_Alignments/ \
+  --outdir ${BASE_DIR}/Cleaned_Codon_Alignments/ \
+  --backupdir ${BASE_DIR}/Cleaned_Codon_Alns/header_backups \
   --array \
   --delim "_" \
   --suffix "_cln" \
