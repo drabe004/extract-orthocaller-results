@@ -34,3 +34,4 @@ scratch/
 # Editor swap files
 *.swp
 *.swo
+*.nfs*
