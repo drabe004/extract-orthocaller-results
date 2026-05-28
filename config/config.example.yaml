@@ -1,0 +1,29 @@
+# Example configuration for extract-orthocaller-results
+# Copy this file to config/config.yaml and edit paths/settings for your system.
+
+project:
+  base_dir: "/path/to/BIGFISHGENOME_DataRespository"
+
+slurm:
+  time: "96:00:00"
+  ntasks: 1
+  cpus_per_task: 8
+  mem: "16g"
+  tmp: "4g"
+  mail_type: "ALL"
+  mail_user: "your_email@example.com"
+
+environment:
+  compatibility_module: "compatibility/agate-centos7"
+  conda_module: "conda"
+  conda_env: "orthocaller"
+  python_module: "python"
+
+inputs:
+  master_summary: "/path/to/master_summary_file.txt"
+  orthocaller_base: "/path/to/Orthocaller_results_directory"
+  generax_key: "/path/to/GeneRaxKey.txt"
+  aln_dir: "/path/to/GeneraxFormattedAlns"
+
+outputs:
+  extracted_proteins: "/path/to/output/EXTRACTED_Proteins"
