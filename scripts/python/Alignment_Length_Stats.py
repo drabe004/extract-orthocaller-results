@@ -1,13 +1,30 @@
+"""
+Alignment Length Statistics
+
+Computes basic alignment statistics for a directory of codon alignments in
+FASTA format. For each alignment, the script reports sequence count,
+alignment length, non-gap codon statistics, and flags alignments below a
+user-defined codon-length threshold.
+
+Author: Danielle Drabeck
+"""
+
 import os
 import sys
 import csv
 from statistics import mean, median
 
 def is_fasta(fn):
+    """
+    Determine whether a filename has a recognized FASTA extension.
+    """
     fnl = fn.lower()
     return fnl.endswith(".fa") or fnl.endswith(".fasta") or fnl.endswith(".fna")
 
 def read_fasta(path):
+    """
+    Read a FASTA file and return a list of (header, sequence) tuples.
+    """
     records = []
     cur_id = None
     cur_seq = []
@@ -28,6 +45,9 @@ def read_fasta(path):
     return records
 
 def nongap_codons(seq):
+    """
+    Count codons that contain no gap characters ('-').
+    """
     L = len(seq)
     codons = 0
     for i in range(0, L - 2, 3):
@@ -38,6 +58,10 @@ def nongap_codons(seq):
     return codons
 
 def main(in_dir, out_csv, min_codons_flag):
+    """
+    Calculate alignment statistics for all FASTA files in a directory and
+    write results to a CSV summary file.
+    """
     rows = []
     codon_lengths = []
 
