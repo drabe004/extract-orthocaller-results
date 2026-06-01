@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH -J rerun_cds_nomatch
-#SBATCH --array=1-846
+#SBATCH --array=1-4000
 #SBATCH --time=10:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -8,28 +8,46 @@
 #SBATCH --mem=4g
 #SBATCH --tmp=4g
 #SBATCH --mail-type=FAIL
-#SBATCH --mail-user=drabe004@umn.edu
-#SBATCH -p mcgaughs_2T
+
+###############################################################################
+# CDS Retrieval Recovery Workflow
+#
+# Reprocesses protein families that failed initial CDS retrieval by targeting
+# entries recorded in the no-match log generated during previous extraction
+# attempts. Each SLURM array task processes a single failed orthogroup and
+# performs an expanded CDS search using species mappings, reference proteomes,
+# and genomic CDS datasets.
+#
+# Outputs include recovered CDS sequences, ambiguous match reports, and
+# updated no-match logs to facilitate iterative dataset completion and
+# quality-control assessment.
+#
+# Intended as a remediation step for maximizing CDS recovery rates in
+# large-scale orthology and comparative genomics workflows.
+#
+# Author: Danielle Drabeck
+###############################################################################
+
+
 
 set -euo pipefail
 
-module load compatibility/agate-centos7
 module load conda
 source activate orthocaller
 
 BASE="${BASE_DIR}/ExtractOrthocallerResults"
 
-PROTDIR="$BASE/EXTRACTED_Proteins_V9_BRAdefault"
-RERUN_LIST="$BASE/EXTRACTED_Proteins_V9_BRAdefault_CDS/nomatch/nomatchlist.txt"
+PROTDIR="$BASE/EXTRACTED_Proteins"
+RERUN_LIST="$BASE/EXTRACTED_Proteins_CDS/nomatch/nomatchlist.txt"
 
-ODIR="$BASE/EXTRACTED_Proteins_V9_BRAdefault_CDS/reruns"
+ODIR="$BASE/EXTRACTED_Proteins_CDS/reruns"
 NOMATCHDIR="$ODIR/nomatch"
 ACDIR="$ODIR/ambcalls"
 LOGDIR="$ODIR/logs"
 
-CDSDIR="/projects/standard/mcgaughs/drabe004/Orthofinder_Datasets/125_Species_OFFICIALDATASET/CDS"
-SPECIES_JSON="/projects/standard/mcgaughs/drabe004/Orthofinder_Datasets/125_Species_OFFICIALDATASET/species_mapping.json"
-ORIGPROTSDIR="/projects/standard/mcgaughs/drabe004/Orthofinder_Datasets/MASTER_FISH_PROTS_128sp"
+CDSDIR="Path/To/Genomic/CDS"
+SPECIES_JSON="path/to/species_mapping.json"
+ORIGPROTSDIR="path/to/proteomefiles" ### If used primary transcript.py (OrthoFinder accessory script) then path to primary transcript result should be used
 
 SCRIPT="$BASE/GetCDSFromProteinsV5_1_symbol_safe.py"
 

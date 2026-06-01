@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=sift_frames
-#SBATCH --output=${BASE_DIR}/Orthocaller_Codon_Alignments/CDSframefix2/CDSframe_%A_%a.out
-#SBATCH --error=${BASE_DIR}/Orthocaller_Codon_Alignments/CDSframefix2/CDSframe_%A_%a.err
-#SBATCH --array=4001-7911
+#SBATCH --output=${BASE_DIR}/CDSframeLOG_%A_%a.out
+#SBATCH --error=${BASE_DIR}/CDSframeLOG_%A_%a.err
+#SBATCH --array=1-4000
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=4g
@@ -14,20 +14,41 @@ set -euo pipefail
 module load conda
 source activate orthocaller
 
+###############################################################################
+# CDS Reading Frame Correction
+#
+# Performs automated reading-frame correction of coding sequences using
+# validated translated protein sequences as references. Each SLURM array task
+# processes a single orthogroup, identifies frame discrepancies between CDS
+# and protein datasets, and generates corrected CDS sequences suitable for
+# downstream codon-aware alignment and evolutionary analyses.
+#
+# Outputs include:
+#   1. Frame-corrected CDS FASTA files.
+#   2. Per-orthogroup correction reports documenting all modifications.
+#
+# This workflow serves as a quality-control step to recover coding sequences
+# affected by frame shifts, translation inconsistencies, or sequence retrieval
+# artifacts prior to comparative genomics and molecular evolution analyses.
+#
+# Author: Danielle Drabeck
+###############################################################################
+
+
 BASE_DIR="${BASE_DIR}"
 
 WORKDIR="${BASE_DIR}/Orthocaller_Codon_Alignments"
-LOG_DIR="${WORKDIR}/CDSframefix2"
+LOG_DIR="${WORKDIR}/CDSframefix"
 mkdir -p "$LOG_DIR"
 cd "$WORKDIR"
 
 # -----------------------------
 # INPUT DIRS / LIST
 # -----------------------------
-PROT_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5_CDS/Translated_Proteins/FRAME_FIXED"
+PROT_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_GetCDSResults/Translated_CDS/FRAME_CORRECTED"
 PROT_LIST="${PROT_DIR}/protein_files.list"
 
-CDS_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5_CDS"
+CDS_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_GetCDSResults"
 
 # -----------------------------
 # OUTPUT DIR

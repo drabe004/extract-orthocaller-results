@@ -12,7 +12,22 @@ cd ${BASE_DIR}/
 module load python
 mkdir -p logs
 
-###This script deletes stop codons and the rest of the header information from the sequences bc hyphy and other programs won't tolerate those things. Header backup CSVs are written as a quick reference to the header information that was truncated each species
+###############################################################################
+# Alignment Header and Stop Codon Cleanup
+#
+# Preprocesses codon alignments for downstream evolutionary analyses by:
+#   1. Removing terminal stop codons from coding sequences.
+#   2. Simplifying FASTA headers to retain only species identifiers.
+#
+# Many phylogenetic and molecular evolution tools (e.g., HyPhy, PAML, IQ-TREE)
+# require standardized sequence names and may fail when presented with complex
+# headers or embedded stop codons. Original header information is preserved in
+# per-alignment backup CSV files for traceability and downstream reference.
+#
+# Designed for high-throughput processing using SLURM job arrays.
+#
+# Author: Danielle Drabeck
+###############################################################################
 
 python cln.py \
   --indir ${BASE_DIR}/Sifted_Codon_Alignments/ \

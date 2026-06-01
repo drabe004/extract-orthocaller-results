@@ -4,14 +4,31 @@
 #SBATCH --mem=8g
 #SBATCH --tmp=4g
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=drabe004@umn.edu
-#SBATCH -p astyanax,msismall
+#SBATCH --mail-user=youremail
 
-cd /panfs/jay/groups/26/mcgaughs/drabe004/BIGFISHGENOME_DataRespository
+
+
+###############################################################################
+# GeneRax Alignment-to-Run Key Generation
+#
+# Builds a lookup table linking input alignment filenames to their
+# corresponding GeneRax run directories by parsing GeneRax log files across
+# completed analysis folders. This key file enables downstream workflows to
+# connect original gene-family alignments with GeneRax output directories,
+# reconciled trees, and Orthocaller classification results.
+#
+# Intended as a metadata indexing step for large-scale phylogenomic workflows
+# where thousands of independent GeneRax runs must be tracked reproducibly.
+#
+# Author: Danielle Drabeck
+###############################################################################
+
+
+cd Your/Main/Dir
 
 # Set the base directory for the GeneRax run folders
-BASEDIR="${BASE_DIR}/Generax_Scripts_and_input/GeneRax_Run4_Results"
-OUTPUT="${BASEDIR}/GeneRaxKey4.txt"
+BASEDIR="${BASE_DIR}/GeneRax_Results"
+OUTPUT="${BASEDIR}/GeneRaxKey.txt"
 
 # Empty the output file if it exists
 echo -n "" > "$OUTPUT"
@@ -30,4 +47,4 @@ find "$BASEDIR" -name "generax.log" | while read logfile; do
 
 done
 
-echo "GeneRaxKey4.txt written to $OUTPUT"
+echo "GeneRaxKey.txt written to $OUTPUT"

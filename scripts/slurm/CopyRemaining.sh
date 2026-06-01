@@ -8,12 +8,33 @@
 
 cd ${BASE_DIR}/Orthocaller_Codon_Alignments
 
+
+###############################################################################
+# Recover Missing Sifted Sequence Files
+#
+# Synchronizes CDS and translated protein datasets by copying sequence files
+# that are present in the source directories but absent from the corresponding
+# sifted output directories. Existing files are preserved and are not
+# overwritten.
+#
+# This utility is primarily intended for recovery, reruns, and workflow
+# maintenance following interrupted jobs or partial file generation during
+# large-scale comparative genomics analyses.
+#
+# File metadata (timestamps and permissions) are retained during copying
+# using the cp -p option.
+#
+# Author: Danielle Drabeck
+###############################################################################
+
+
+
 # ---- PATHS ----
-CDS_IN="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5_CDS/FRAME_CORRECTED"
+CDS_IN="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_GetCDSResults/FRAME_CORRECTED"
 
 CDS_OUT="${CDS_IN}/SIFTED_CDS"
 
-PROT_IN="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5_CDS/Translated_Proteins/FRAME_FIXED"
+PROT_IN="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_GetCDSResults/Translated_CDS/FRAME_CORRECTED"
 PROT_OUT="${PROT_IN}/SIFTED_TRANSLATED_CDS"
 
 # ---- MAKE OUTPUT DIRS ----

@@ -1,14 +1,33 @@
 #!/bin/bash
 #SBATCH --job-name=framefix_array
-#SBATCH --output=${BASE_DIR}/ExtractOrthocallerResults/FrameFixLog2/framefix_array_%A_%a.out
-#SBATCH --error=${BASE_DIR}/ExtractOrthocallerResults/FrameFixLog2/framefix_array_%A_%a.err
-#SBATCH --array=4001-7950
+#SBATCH --output=${BASE_DIR}/framefix_array_%A_%a.out
+#SBATCH --error=${BASE_DIR}/framefix_array_%A_%a.err
+#SBATCH --array=1-4000
 #SBATCH --time=06:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=4g
 #SBATCH --tmp=4g
-#SBATCH -p astyanax
+
+
+###############################################################################
+# Protein Translation Frame Repair
+#
+# Processes translated protein datasets identified as containing potential
+# frame inconsistencies during frame-validation quality control. Using CDS
+# sequences, original protein references, and frame-check reports, this
+# workflow attempts to recover and correct translation errors resulting from
+# frame shifts, truncations, or sequence retrieval artifacts.
+#
+# Each SLURM array task processes a single orthogroup and writes corrected
+# protein sequences to a dedicated output directory for downstream codon
+# alignment generation and evolutionary analyses.
+#
+# Intended as an automated remediation step following frame-validation
+# screening within the Orthocaller workflow.
+#
+# Author: Danielle Drabeck
+###############################################################################
 
 set -euo pipefail
 
@@ -21,10 +40,10 @@ module load conda
 source activate orthocaller
 
 #### paths
-TRANSLATED_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5_CDS/Translated_Proteins"
-FRAMEFAIL_DIR="${BASE_DIR}/Orthocaller_Codon_Alignments/FrameCheckOutput_April_30/"
-CDS_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5_CDS"
-ORIGINAL_PROT_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5/ORIGINALSEQS_Unaligned"
+TRANSLATED_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_CDS/Translated_Proteins"
+FRAMEFAIL_DIR="${BASE_DIR}/Orthocaller_Codon_Alignments/FrameCheckOutput/"
+CDS_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_CDS"
+ORIGINAL_PROT_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins/ORIGINALSEQS_Unaligned"
 
 OUT_DIR="${TRANSLATED_DIR}/FRAME_FIXED"
 mkdir -p "${OUT_DIR}"

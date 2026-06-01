@@ -6,16 +6,37 @@
 #SBATCH --mem=24g
 #SBATCH --tmp=10g
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=drabe004@umn.edu
+
+
+###############################################################################
+# CDS Translation Pipeline
+#
+# Translates orthogroup-specific coding sequence (CDS) datasets into protein
+# sequences using the standard genetic code. Protein translations are
+# generated for all recovered CDS files and organized into a dedicated output
+# directory for downstream frame validation, sequence quality control, and
+# protein alignment workflows.
+#
+# This step provides an independent translation-based verification layer that
+# enables detection of frame shifts, premature stop codons, sequence retrieval
+# errors, and other inconsistencies prior to codon-aware evolutionary
+# analyses.
+#
+# Author: Danielle Drabeck
+###############################################################################
+
+
+
+
+
 set -euo pipefail
 
 cd ${BASE_DIR}/ExtractOrthocallerResults
 
-module load compatibility/agate-centos7
 module load conda
 source activate orthocaller
 
 
 python translate_CDS_folder.py \
-  --indir ${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V9_BRAdefault_CDS \
-  --outdir ${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V9_BRAdefault_CDS/Translated_Proteins
+  --indir ${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_CDS \
+  --outdir ${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_CDS/Translated_Proteins

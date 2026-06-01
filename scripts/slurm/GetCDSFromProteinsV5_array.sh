@@ -1,6 +1,6 @@
 #!/bin/bash -l
-#SBATCH -J getcds_array_v5
-#SBATCH --array=5201-7000
+#SBATCH -J getcds_array
+#SBATCH --array=1-4000
 #SBATCH --time=10:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -8,15 +8,40 @@
 #SBATCH --mem=4g
 #SBATCH --tmp=4g
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=drabe004@umn.edu
-# (no -o/-e here; we’ll redirect at runtime)
+
+
+###############################################################################
+# CDS Retrieval from Ortholog Protein Families
+#
+# High-throughput sequence recovery workflow for extracting coding sequences
+# (CDS) corresponding to Orthocaller-derived protein families. Protein
+# identifiers are matched against genomic CDS datasets using species-specific
+# mappings and reference proteomes to reconstruct orthogroup-level CDS
+# datasets suitable for downstream codon-aware analyses.
+#
+# Processing is parallelized using SLURM job arrays, with one orthogroup
+# processed per task. Ambiguous matches and unresolved sequences are logged
+# separately to facilitate quality control, troubleshooting, and iterative
+# recovery workflows.
+#
+# Outputs include:
+#   1. Orthogroup-specific CDS FASTA files.
+#   2. Ambiguous match reports.
+#   3. No-match diagnostic logs.
+#
+# This workflow serves as the primary CDS extraction stage linking orthology
+# classifications to codon-based comparative genomics and molecular evolution
+# analyses.
+#
+# Author: Danielle Drabeck
+###############################################################################
 
 set -euo pipefail
 
 # -------------------------------
 # Logging
 # -------------------------------
-LOGDIR="${BASE_DIR}/ExtractOrthocallerResults/logs_may12"
+LOGDIR="${BASE_DIR}/ExtractOrthocallerResults/logs"
 mkdir -p "$LOGDIR"
 exec > "${LOGDIR}/cds_array_v5_May12.${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.out" \
      2> "${LOGDIR}/cds_array_v5_May12.${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.err"
@@ -24,29 +49,28 @@ exec > "${LOGDIR}/cds_array_v5_May12.${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID
 # -------------------------------
 # Environment
 # -------------------------------
-module load compatibility/agate-centos7
 module load conda
 source activate orthocaller
 
 # -------------------------------
 # Inputs / Outputs
 # -------------------------------
-FILELIST="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V9_BRAdefault/Unaligned_Fastas/filelist.txt"
+FILELIST="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins/filelist.txt"
 
 # CDS directory (CDS FASTAs used for ID lookups)
-CDSDIR="/projects/standard/mcgaughs/drabe004/Orthofinder_Datasets/125_Species_OFFICIALDATASET/CDS"
+CDSDIR="path/to/genomic/CDS"
 
 # species mapping JSON
-SPECIES_JSON="/projects/standard/mcgaughs/drabe004/Orthofinder_Datasets/125_Species_OFFICIALDATASET/species_mapping.json"
+SPECIES_JSON="Path/To/species_mapping.json"
 
 # Original Ensembl protein FASTAs (for resolving Ensembl multi-hits by transcript)
-ORIGPROTSDIR="/projects/standard/mcgaughs/drabe004/Orthofinder_Datasets/MASTER_FISH_PROTS_128sp"
+ORIGPROTSDIR="Path/To/Genomic/Proteome/files"
 
 # If FILELIST contains relative paths, resolve them against this dir
-SHORTIN_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V9_BRAdefault/Unaligned_Fastas"
+SHORTIN_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins"
 
 # Output roots
-ODIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V9_BRAdefault_CDS"
+ODIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_CDS"
 ACDIR="$ODIR/ambcalls"
 NMDIR="$ODIR/nomatch"
 mkdir -p "$ODIR" "$ACDIR" "$NMDIR"

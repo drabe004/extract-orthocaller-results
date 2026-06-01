@@ -2,7 +2,7 @@
 #SBATCH --job-name=frame_check
 #SBATCH --output=logs/frame_check_%A_%a.out
 #SBATCH --error=logs/frame_check_%A_%a.err
-#SBATCH --array=4001-7950
+#SBATCH --array=1-4000
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=4g
@@ -11,20 +11,35 @@
 
 set -euo pipefail
 
+###############################################################################
+# Frame Check SLURM Array
+#
+# High-throughput quality control workflow for validating translated CDS
+# sequences against reference protein alignments prior to codon-based
+# evolutionary analyses. Executes one orthogroup per SLURM array task and
+# identifies potential frame disruptions, translation errors, and sequence
+# mismatches using a configurable similarity threshold.
+#
+# Intended for use in large-scale comparative genomics and phylogenomic
+# pipelines.
+#
+# Author: Danielle Drabeck
+###############################################################################
+
 ############################
 # User configuration
 ############################
 
-BASE_DIR="/path/to/BIGFISHGENOME_DataRespository"
+BASE_DIR="/path/to/MyBaseDir"
 
-EXTRACTED_DIR="${BASE_DIR}/ExtractOrthocallerResults"
-CODON_DIR="${BASE_DIR}/Orthocaller_Codon_Alignments"
+EXTRACTED_DIR="${BASE_DIR}/MyExtractDir"
+CODON_DIR="${BASE_DIR}/MyCodonAlnDir"
 
-PROTEIN_DATASET="EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5"
+PROTEIN_DATASET="MyOrthocallerExtractedProteinsDir"
 CDS_DATASET="${PROTEIN_DATASET}_CDS"
 
 FRAME_FIXED_DIR="FRAME_FIXED"
-FRAMECHECK_OUTPUT="FrameCheckOutput_May3"
+FRAMECHECK_OUTPUT="FrameCheckOutput_DateTime"
 
 TRANSLATED_DIR="${EXTRACTED_DIR}/${CDS_DATASET}/Translated_Proteins/${FRAME_FIXED_DIR}"
 ORIGINAL_DIR="${EXTRACTED_DIR}/${PROTEIN_DATASET}/ORIGINALSEQS_Unaligned"

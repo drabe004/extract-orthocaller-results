@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=sift_frames
-#SBATCH --output=${BASE_DIR}/Orthocaller_Codon_Alignments/SIFTMay3/sift_%A_%a.out
-#SBATCH --error=${BASE_DIR}/Orthocaller_Codon_Alignments/SIFTMay3/sift_%A_%a.err
-#SBATCH --array=1-546
+#SBATCH --output=${BASE_DIR}/logs/sift_%A_%a.out
+#SBATCH --error=${BASE_DIR}/logs/sift_%A_%a.err
+#SBATCH --array=1-4000
 #SBATCH --time=10:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=4g
@@ -43,11 +43,11 @@ mkdir -p SIFT
 module load conda
 source activate orthocaller
 
-FAIL_CSV_DIR="${BASE_DIR}/Orthocaller_Codon_Alignments/FrameCheckOutput_May3"
+FAIL_CSV_DIR="${BASE_DIR}/Orthocaller_Codon_Alignments/FrameCheckOutput"
 
-CDS_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5_CDS/FRAME_CORRECTED"
+CDS_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_CDS/FRAME_CORRECTED"
 
-PROTEIN_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_V8_ShortestDist_NoBranchReassignments5_CDS/Translated_Proteins/FRAME_FIXED"
+PROTEIN_DIR="${BASE_DIR}/ExtractOrthocallerResults/EXTRACTED_Proteins_CDS/Translated_Proteins/FRAME_CORRECTED"
 
 OUT_CDS_DIR="${CDS_DIR}/SIFTED_CDS"
 OUT_PROTEIN_DIR="${PROTEIN_DIR}/SIFTED_TRANSLATED_CDS"
