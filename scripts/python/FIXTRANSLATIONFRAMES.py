@@ -1,4 +1,27 @@
+```python
 #!/usr/bin/env python3
+"""
+Frame fixer for translated protein FASTA files.
+
+This script copies all translated protein FASTAs into a FRAME_FIXED-style output
+directory. If a matching *.frameFAIL.csv exists, only the sequences flagged as
+failures are replaced.
+
+For each failing sequence, the script:
+    1) Finds the matching CDS sequence.
+    2) Finds the matching original protein sequence.
+    3) Translates the CDS in all six reading frames.
+    4) Compares each translated frame to the original protein.
+    5) Replaces the failed translated sequence with the highest-identity frame.
+
+Files with no frameFAIL CSV are copied unchanged.
+
+Important:
+    Failed sequences are replaced with the best available frame translation if
+    one exists, even if the best identity does not improve or remains below the
+    threshold. Warnings are printed in those cases.
+"""
+
 import argparse
 import csv
 import os
@@ -14,6 +37,12 @@ from Bio.Align import PairwiseAligner
 
 
 def clean_seq(s: str) -> str:
+    """
+    Normalize a protein sequence.
+
+    Removes whitespace, converts to uppercase, and removes trailing stop
+    characters.
+    """
     s = re.sub(r"\s+", "", str(s)).upper()
     #### drop terminal stop(s)
     while s.endswith("*"):
@@ -22,11 +51,20 @@ def clean_seq(s: str) -> str:
 
 
 def species_key_before_first_underscore_from_id(seq_id: str) -> str:
+    """
+    Extract a species key from a FASTA record ID.
+
+    Uses the first whitespace-delimited token, then keeps everything before the
+    first underscore.
+    """
     token = seq_id.split()[0]
     return token.split("_", 1)[0]
 
 
 def build_aligner() -> PairwiseAligner:
+    """
+    Build the global pairwise aligner used for protein identity comparisons.
+    """
     aligner = PairwiseAligner()
     aligner.mode = "global"
     aligner.match_score = 1.0
@@ -37,6 +75,9 @@ def build_aligner() -> PairwiseAligner:
 
 
 def align_to_gapped_strings(aligner: PairwiseAligner, s1: str, s2: str) -> Tuple[str, str]:
+    """
+    Globally align two sequences and return aligned strings with gap characters.
+    """
     if not s1 or not s2:
         return s1, s2
 
@@ -67,6 +108,13 @@ def align_to_gapped_strings(aligner: PairwiseAligner, s1: str, s2: str) -> Tuple
 
 
 def identity_ignore_gaps(aln_a: str, aln_b: str) -> Tuple[int, int, int, float]:
+    """
+    Calculate sequence identity while ignoring columns where either sequence has
+    a gap.
+
+    Returns:
+        compared, matches, mismatches, identity_fraction
+    """
     #### Compare only positions where BOTH are non-gap.
     #### Returns: compared, matches, mismatches, identity_fraction
     compared = matches = mismatches = 0
@@ -84,10 +132,19 @@ def identity_ignore_gaps(aln_a: str, aln_b: str) -> Tuple[int, int, int, float]:
 
 
 def wrap60(s: str, width: int = 60) -> str:
+    """
+    Wrap a sequence string to fixed-width FASTA-style lines.
+    """
     return "\n".join(s[i:i + width] for i in range(0, len(s), width))
 
 
 def find_matching_framefail_csv(framefail_dir: str, translated_basename: str) -> Optional[str]:
+    """
+    Find the frameFAIL CSV associated with a translated protein FASTA.
+
+    Matching is based on the translated filename prefix before
+    .faa_protein.faa.
+    """
     #### translated_basename is the filename only (not path)
     #### We match by the "start" prefix = basename without .faa_protein.faa
     prefix = translated_basename.replace(".faa_protein.faa", "")
@@ -102,18 +159,28 @@ def find_matching_framefail_csv(framefail_dir: str, translated_basename: str) ->
 
 
 def translated_to_cds_filename(translated_basename: str) -> str:
+    """
+    Convert a translated protein FASTA filename to the expected CDS filename.
+    """
     #### 1000_... .faa_protein.faa  ->  1000_... .faa_CDS.fasta
     base = translated_basename.replace(".faa_protein.faa", "")
     return base + ".faa_CDS.fasta"
 
 
 def translated_to_original_protein_filename(translated_basename: str) -> str:
+    """
+    Convert a translated protein FASTA filename to the expected original protein
+    FASTA filename.
+    """
     #### 1000_... .faa_protein.faa  ->  1000_... _ORIGINALSEQS.faa
     base = translated_basename.replace(".faa_protein.faa", "")
     return base + "_ORIGINALSEQS.faa"
 
 
 def load_fasta_by_id(path: str) -> Dict[str, Seq]:
+    """
+    Load a FASTA file into a dictionary keyed by record ID.
+    """
     d: Dict[str, Seq] = {}
     for rec in SeqIO.parse(path, "fasta"):
         d[rec.id] = rec.seq
@@ -121,6 +188,15 @@ def load_fasta_by_id(path: str) -> Dict[str, Seq]:
 
 
 def translate_six_frames(cds_seq: Seq, table: int = 1) -> List[Tuple[str, str]]:
+    """
+    Translate a CDS sequence in all six reading frames.
+
+    Returns:
+        List of frame_label, cleaned_protein_sequence pairs.
+
+    Frames:
+        +1, +2, +3, -1, -2, -3
+    """
     #### returns list of (frame_label, protein_string_cleaned)
     #### frames: +1,+2,+3,-1,-2,-3
     frames: List[Tuple[str, str]] = []
@@ -158,6 +234,15 @@ def best_frame_translation(
     aligner: PairwiseAligner,
     table: int,
 ) -> Tuple[str, str, float, str, str]:
+    """
+    Find the six-frame CDS translation that best matches the original protein.
+
+    Each translated frame is globally aligned to the original protein, then
+    scored using gap-ignored identity.
+
+    Returns:
+        best_frame_label, best_protein, best_identity, best_aln_a, best_aln_b
+    """
     #### returns (best_frame_label, best_protein, best_identity, best_aln_a, best_aln_b)
     best_frame = "NA"
     best_prot = ""
@@ -189,12 +274,21 @@ def current_identity(
     original_protein: str,
     aligner: PairwiseAligner,
 ) -> Tuple[float, str, str]:
+    """
+    Compare the current translated protein sequence to the original protein.
+
+    Returns:
+        identity_fraction, aligned_current, aligned_original
+    """
     aln_a, aln_b = align_to_gapped_strings(aligner, current_translated, original_protein)
     _, _, _, ident = identity_ignore_gaps(aln_a, aln_b)
     return ident, aln_a, aln_b
 
 
 def parse_framefail_csv(csv_path: str) -> List[dict]:
+    """
+    Read a frameFAIL CSV and return rows where passes_threshold is NO.
+    """
     #### returns list of failing rows (already should be only fails, but we enforce NO)
     fails: List[dict] = []
     with open(csv_path, "r", newline="") as fh:
@@ -206,6 +300,16 @@ def parse_framefail_csv(csv_path: str) -> List[dict]:
 
 
 def main():
+    """
+    Run the frame-fixing workflow.
+
+    Processes either one translated protein FASTA supplied with --infile, or all
+    *.faa_protein.faa files in --translated_dir.
+
+    For files without a matching frameFAIL CSV, the input FASTA is copied
+    unchanged. For files with failures, only failed sequences are replaced using
+    the best six-frame CDS translation.
+    """
     ap = argparse.ArgumentParser(
         description="Frame fixer: copy all translated protein FASTAs into FRAME_FIXED, and replace only sequences flagged in *.frameFAIL.csv by best of 6-frame CDS translations."
     )
@@ -432,4 +536,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
+```

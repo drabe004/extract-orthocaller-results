@@ -4,6 +4,16 @@
 ### using headers from an aligned protein file. DB-aware (Ensembl / NCBI / IN HOUSE).
 ### Writes <input_basename>_ORIGINALSEQS.faa, per-file .nomatch.tsv, and appends a master summary TSV.
 
+"""
+Recover original unaligned protein sequences from species-specific
+primary_transcripts FASTA files using identifiers parsed from aligned
+protein FASTA headers.
+
+The script supports Ensembl, NCBI, and in-house accession formats, writes
+recovered original protein FASTA files, records unmatched headers, and
+updates a master summary table for quality control.
+"""
+
 import os
 import sys
 import csv
@@ -15,6 +25,9 @@ import re
 ### -------------------------------
 
 def read_fasta_iter(path):
+    """
+    Yield FASTA header and sequence pairs from a FASTA file.
+    """
     ### Yield (header, sequence) from a FASTA file.
     header = None
     chunks = []
@@ -33,6 +46,9 @@ def read_fasta_iter(path):
             yield (header, "".join(chunks))
 
 def index_fasta_ids(path):
+    """
+    Index FASTA records by their first-token identifiers.
+    """
     ### Index first-token IDs -> (full_header, sequence).
     idx = {}
     for h, s in read_fasta_iter(path):
@@ -45,6 +61,9 @@ def index_fasta_ids(path):
 ### -------------------------------
 
 def _get_first_present(row, keys):
+    """
+    Return the first non-empty value from a row across candidate keys.
+    """
     ### Return the first present, non-empty value among candidate keys; else raise KeyError.
     for k in keys:
         if k in row and row[k] is not None and str(row[k]).strip() != "":
@@ -52,6 +71,9 @@ def _get_first_present(row, keys):
     raise KeyError("None of the candidate species columns present: " + ", ".join(keys))
 
 def load_species_key_csv(csv_path):
+    """
+    Load the species key CSV and map species identifiers to protein files and database types.
+    """
     ### Load the species key CSV.
     ### Returns: { species_concat_no_underscores: (species_with_underscores, prot_file_name, database_type) }
     map_concat = {}
@@ -88,6 +110,9 @@ def load_species_key_csv(csv_path):
 HDR_SPLIT = re.compile(r"^>(?P<species>[A-Za-z0-9]+)_(?P<rest>\S+)")
 
 def parse_header_line(raw_header):
+    """
+    Parse an aligned protein FASTA header into species and accession-token components.
+    """
     ### Return (species_concat, trailing_token) or (None, None) if not matched.
     m = HDR_SPLIT.match(">" + raw_header if not raw_header.startswith(">") else raw_header)
     if not m:
@@ -108,6 +133,9 @@ NCBI_FUSED = re.compile(r"^[A-Z]*P(?P<num>\d+?)(?P<ver>\d)(?!\d)")
 INHOUSE_UN = re.compile(r"UN(?P<num>\d+)T(?P<t>\d+)")
 
 def candid_ensembl(token):
+    """
+    Build possible Ensembl-style accession candidates from a header token.
+    """
     m = ENS_PREFIX_DIGITS.match(token)
     if not m:
         return [token] if token else []
@@ -132,6 +160,9 @@ def candid_ensembl(token):
     return out
 
 def candid_ncbi(token):
+    """
+    Build possible NCBI accession candidates from a header token.
+    """
     m = NCBI_ACC.search(token)
     if m:
         core = m.group(1); vers = m.group(2) or ""
@@ -143,6 +174,9 @@ def candid_ncbi(token):
     return []
 
 def candid_inhouse(token):
+    """
+    Build possible in-house FUN transcript candidates from a header token.
+    """
     m = INHOUSE_UN.search(token)
     if not m:
         return []
@@ -150,6 +184,9 @@ def candid_inhouse(token):
     return [f"FUN_{num}-T{t}"]
 
 def derive_candidates_by_db(db_type, trailing_token):
+    """
+    Generate deduplicated accession candidates using database-specific parsing rules.
+    """
     dbu = db_type.strip().upper()
     cands = []
     if dbu == "ENSEMBL":
@@ -175,6 +212,9 @@ def derive_candidates_by_db(db_type, trailing_token):
 ### -------------------------------
 
 def process_one_file(in_fasta, primary_root, key_csv, out_dir, no_match_dir, debug=False):
+    """
+    Recover original protein sequences for one aligned FASTA file and write outputs and QC logs.
+    """
     species_map = load_species_key_csv(key_csv)
 
     base = os.path.basename(in_fasta)
@@ -343,6 +383,9 @@ def process_one_file(in_fasta, primary_root, key_csv, out_dir, no_match_dir, deb
 ### -------------------------------
 
 def main():
+    """
+    Parse command-line arguments and run original protein recovery.
+    """
     ap = argparse.ArgumentParser(
         description="Recover original unaligned proteins from species primary_transcripts FASTAs (DB-aware)."
     )

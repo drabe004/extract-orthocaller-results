@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+"""
+Translate CDS FASTA files into protein FASTA files using a specified
+NCBI translation table.
+
+The script processes all matching CDS FASTA files in an input directory,
+translates nucleotide sequences to amino acid sequences, trims trailing
+nucleotides when sequence lengths are not divisible by three, and writes
+translated protein FASTA files to an output directory.
+"""
+
 import argparse
 from pathlib import Path
 from Bio import SeqIO
@@ -8,6 +18,10 @@ from Bio.SeqRecord import SeqRecord
 
 
 def main():
+    """
+    Parse command-line arguments and translate CDS FASTA files
+    into protein FASTA files.
+    """
     parser = argparse.ArgumentParser(
         description="Translate CDS FASTA files to protein FASTA files."
     )

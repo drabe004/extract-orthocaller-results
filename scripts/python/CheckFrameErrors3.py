@@ -1,4 +1,20 @@
+```python
 #!/usr/bin/env python3
+"""
+Compare translated protein FASTA files against their original protein FASTA files.
+
+For each translated FASTA, this script looks for the matching original FASTA,
+matches records by species key, globally aligns translated/original sequences,
+and writes a failure-only CSV when problems are detected.
+
+Failures include:
+    1) Missing original FASTA file.
+    2) Species present in translated FASTA but missing from original FASTA.
+    3) Pairwise identity below the specified threshold, or no comparable residues.
+
+Output CSVs contain only failing rows.
+"""
+
 import argparse
 import csv
 import os
@@ -10,6 +26,12 @@ from Bio.Align import PairwiseAligner
 
 
 def clean_seq(s: str) -> str:
+    """
+    Normalize a sequence string for comparison.
+
+    Removes whitespace, converts to uppercase, and drops a terminal stop codon
+    if the sequence ends with '*'.
+    """
     s = re.sub(r"\s+", "", s).upper()
     # drop terminal stop
     if s.endswith("*"):
@@ -18,11 +40,26 @@ def clean_seq(s: str) -> str:
 
 
 def species_key_before_first_underscore(rec) -> str:
+    """
+    Extract the species key from a FASTA record ID.
+
+    Uses the first whitespace-delimited token of the record ID, then keeps
+    everything before the first underscore.
+    """
     token = rec.id.split()[0]
     return token.split("_", 1)[0]
 
 
 def load_by_species_key(path: str) -> Dict[str, Tuple[str, str]]:
+    """
+    Load a FASTA file into a dictionary keyed by species key.
+
+    Returns:
+        Dict mapping species_key -> (record_id, cleaned_sequence)
+
+    If multiple records have the same species key, only the first one
+    encountered is kept.
+    """
     #### returns species_key -> (record_id, sequence)
     #### keeps the first record encountered for a species_key
     d: Dict[str, Tuple[str, str]] = {}
@@ -34,6 +71,9 @@ def load_by_species_key(path: str) -> Dict[str, Tuple[str, str]]:
 
 
 def build_aligner() -> PairwiseAligner:
+    """
+    Build and configure the global pairwise aligner used for sequence comparison.
+    """
     aligner = PairwiseAligner()
     aligner.mode = "global"
     aligner.match_score = 1.0
@@ -44,6 +84,12 @@ def build_aligner() -> PairwiseAligner:
 
 
 def align_to_gapped_strings(aligner: PairwiseAligner, s1: str, s2: str) -> Tuple[str, str]:
+    """
+    Globally align two sequences and return the aligned strings with gaps.
+
+    Returns:
+        Tuple of aligned sequence strings: (aligned_s1, aligned_s2)
+    """
     if not s1 or not s2:
         return s1, s2
     aln = aligner.align(s1, s2)[0]
@@ -73,6 +119,15 @@ def align_to_gapped_strings(aligner: PairwiseAligner, s1: str, s2: str) -> Tuple
 
 
 def identity_ignore_gaps(aln_a: str, aln_b: str) -> Tuple[int, int, int, float]:
+    """
+    Calculate pairwise identity while ignoring gap-containing columns.
+
+    Only positions where both aligned sequences have non-gap characters are
+    compared.
+
+    Returns:
+        compared, matches, mismatches, identity_fraction
+    """
     #### Compare only positions where BOTH are non-gap.
     #### Returns: compared, matches, mismatches, identity_fraction
     compared = matches = mismatches = 0
@@ -90,6 +145,9 @@ def identity_ignore_gaps(aln_a: str, aln_b: str) -> Tuple[int, int, int, float]:
 
 
 def out_csv_name(translated_filename: str) -> str:
+    """
+    Build the output CSV filename from a translated FASTA filename.
+    """
     base = translated_filename.replace(".faa_protein.faa", "")
     return f"{base}.frameFAIL.csv"
 
@@ -101,6 +159,23 @@ def process_one_file(
     threshold: float,
     aligner: PairwiseAligner,
 ) -> str:
+    """
+    Process one translated FASTA file against its matching original FASTA file.
+
+    Args:
+        tpath: Path to the translated FASTA file.
+        original_dir: Directory containing original FASTA files.
+        out_dir: Directory where failure CSVs should be written.
+        threshold: Minimum identity fraction required to pass.
+        aligner: Configured PairwiseAligner object.
+
+    Returns:
+        Output CSV path if a failure CSV was written; otherwise "".
+
+    Notes:
+        A CSV is written only when at least one failure exists.
+        Output rows include failures only; passing rows are not written.
+    """
     #### Returns output path if written, else "".
     ####
     #### Writes a CSV ONLY when at least one "failure" exists. Failures include:
@@ -232,6 +307,13 @@ def process_one_file(
 
 
 def main():
+    """
+    Parse command-line arguments and run the frame-failure comparison workflow.
+
+    The script can process either:
+        1) a single translated FASTA file using --infile, or
+        2) all translated FASTA files in --translated_dir.
+    """
     ap = argparse.ArgumentParser(
         #### no triple quotes; keep help simple
         description="Write a CSV only when failures exist; output contains only failing rows."
@@ -287,3 +369,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```

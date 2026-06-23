@@ -1,4 +1,24 @@
+```python
 #!/usr/bin/env python3
+
+"""
+Build a master Orthocaller summary from *_generax summary.txt files.
+
+This script scans all *_generax directories under a base input directory,
+extracts orthogroups meeting user-defined species thresholds, and writes a
+single consolidated summary file.
+
+For each summary.txt file:
+    1) Parse orthogroup entries containing species counts.
+    2) Extract total species, cavefish species, and background species.
+    3) Apply minimum cavefish and background thresholds.
+    4) Rewrite the orthogroup ID using the parent *_generax directory name.
+    5) Write passing orthogroups to a master summary file.
+
+Typical use:
+    Generate a filtered master orthogroup list for downstream Orthocaller,
+    PAL2NAL, selection-test, or sequence-extraction workflows.
+"""
 
 import argparse
 import os
@@ -6,6 +26,12 @@ import re
 
 
 def parse_args():
+    """
+    Parse command-line arguments.
+
+    Returns:
+        argparse.Namespace containing input paths and filtering thresholds.
+    """
     parser = argparse.ArgumentParser(
         description="Build a master summary from Orthocaller *_generax/summary.txt files."
     )
@@ -35,6 +61,18 @@ def parse_args():
 
 
 def main():
+    """
+    Build a filtered master orthogroup summary.
+
+    Workflow:
+        1) Find all *_generax directories.
+        2) Open each summary.txt file.
+        3) Parse orthogroup species-count entries.
+        4) Filter by cavefish and background thresholds.
+        5) Write passing orthogroups to the output file.
+
+    Summary statistics are printed at completion.
+    """
     args = parse_args()
 
     input_dir = os.path.abspath(args.input_dir)
@@ -104,3 +142,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```

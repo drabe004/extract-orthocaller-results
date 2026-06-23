@@ -1,4 +1,34 @@
+```python
 #!/usr/bin/env python3
+"""
+Extract Orthocaller-selected protein sequences from GeneRax alignment FASTAs.
+
+This script starts from a master Orthocaller summary, identifies the selected
+orthogroup entries, maps those entries back to the corresponding GeneRax
+alignment FASTA files, and extracts the matching protein sequences.
+
+Inputs:
+    --master_summary
+        File listing target orthogroups. Each useful line is expected to begin
+        with an orthogroup ID before the first ":".
+
+    --orthocaller_base
+        Base directory containing Orthocaller output subdirectories.
+
+    --generax_key
+        CSV-like key mapping GeneRax orthogroup IDs to alignment FASTA names.
+
+    --aln_dir
+        Directory containing GeneRax alignment FASTA files.
+
+Outputs:
+    - extraction_report.tsv
+    - Either one combined FASTA or one extracted FASTA per orthogroup.
+
+Typical use:
+    Recover the exact protein sequences selected by Orthocaller for downstream
+    annotation, QC, or comparison against original GeneRax alignments.
+"""
 
 import argparse
 import csv
@@ -8,6 +38,18 @@ from typing import Dict, List, Tuple
 
 
 def read_master_summary(master_summary_path: Path) -> List[str]:
+    """
+    Read target orthogroup IDs from a master summary file.
+
+    Each non-empty, non-comment line is parsed by taking the text before the
+    first colon.
+
+    Args:
+        master_summary_path: Path to the master summary file.
+
+    Returns:
+        List of orthogroup IDs.
+    """
     ogs = []
 
     with master_summary_path.open() as fh:
@@ -26,6 +68,18 @@ def read_master_summary(master_summary_path: Path) -> List[str]:
 
 
 def read_generax_key(key_path: Path) -> Dict[str, str]:
+    """
+    Read the GeneRax alignment key file.
+
+    Expected format:
+        fasta_filename,generax_orthogroup_id
+
+    Args:
+        key_path: Path to the GeneRax key file.
+
+    Returns:
+        Dictionary mapping GeneRax orthogroup ID -> FASTA filename.
+    """
     mapping = {}
 
     with key_path.open() as fh:
@@ -47,12 +101,34 @@ def read_generax_key(key_path: Path) -> Dict[str, str]:
 
 
 def og_dir_from_og_full(og_full: str) -> str:
+    """
+    Convert a full Orthocaller gene ID into its parent orthogroup directory name.
+
+    Args:
+        og_full: Full orthogroup/gene identifier.
+
+    Returns:
+        Parent orthogroup directory name.
+    """
     if "-Gene-" in og_full:
         return og_full.split("-Gene-", 1)[0]
     return og_full
 
 
 def csv_row_candidates(og_full: str) -> List[str]:
+    """
+    Generate possible Orthocaller CSV row IDs for a target orthogroup.
+
+    Master summary/output may use 107b_generax-Gene-18, but the internal
+    orthogroup CSV row may still use 107_generax-Gene-18. This function tries
+    both while preserving og_full for output.
+
+    Args:
+        og_full: Full orthogroup/gene ID from the master summary.
+
+    Returns:
+        Ordered list of candidate row IDs to try.
+    """
     """
     Master summary/output may use 107b_generax-Gene-18,
     but the internal orthogroup CSV row may still use 107_generax-Gene-18.
@@ -67,6 +143,20 @@ def csv_row_candidates(og_full: str) -> List[str]:
 
 
 def read_orthocaller_row(orthocaller_csv: Path, target_og: str) -> List[str]:
+    """
+    Read selected sequence entries for one orthogroup from an Orthocaller CSV.
+
+    Args:
+        orthocaller_csv: Path to the Orthocaller orthogroup CSV.
+        target_og: Orthogroup row ID to find.
+
+    Returns:
+        List of selected entry identifiers from the matching row.
+
+    Raises:
+        FileNotFoundError: If the Orthocaller CSV does not exist.
+        ValueError: If the target orthogroup row is not found.
+    """
     if not orthocaller_csv.exists():
         raise FileNotFoundError(f"Missing orthocaller csv: {orthocaller_csv}")
 
@@ -88,6 +178,21 @@ def read_orthocaller_row(orthocaller_csv: Path, target_og: str) -> List[str]:
 
 
 def read_orthocaller_row_with_fallback(orthocaller_csv: Path, og_full: str) -> Tuple[List[str], str]:
+    """
+    Read an Orthocaller row, trying fallback row-name candidates if needed.
+
+    Args:
+        orthocaller_csv: Path to Orthocaller orthogroup CSV.
+        og_full: Full orthogroup/gene ID from master summary.
+
+    Returns:
+        Tuple of:
+            - selected entry identifiers
+            - row ID that successfully matched
+
+    Raises:
+        Exception: Re-raises the last error if all candidates fail.
+    """
     last_error = None
 
     for candidate in csv_row_candidates(og_full):
@@ -101,6 +206,18 @@ def read_orthocaller_row_with_fallback(orthocaller_csv: Path, og_full: str) -> T
 
 
 def parse_key_from_entry(entry: str) -> str:
+    """
+    Extract the searchable sequence key from an Orthocaller entry.
+
+    If the entry contains underscores, the portion after the final underscore is
+    used. Otherwise the full entry is returned.
+
+    Args:
+        entry: Orthocaller selected sequence entry.
+
+    Returns:
+        Sequence key used to search FASTA headers.
+    """
     if "_" not in entry:
         return entry
 
@@ -108,6 +225,15 @@ def parse_key_from_entry(entry: str) -> str:
 
 
 def fasta_iter(fasta_path: Path):
+    """
+    Iterate through FASTA records.
+
+    Args:
+        fasta_path: Path to FASTA file.
+
+    Yields:
+        Tuples of (header_without_>, sequence).
+    """
     header = None
     chunks = []
 
@@ -127,6 +253,18 @@ def fasta_iter(fasta_path: Path):
 
 
 def collect_matches(fasta_path: Path, target_keys: List[str]) -> Tuple[List[Tuple[str, str]], Dict[str, bool]]:
+    """
+    Collect FASTA records whose headers contain target sequence keys.
+
+    Args:
+        fasta_path: Path to GeneRax alignment FASTA.
+        target_keys: Sequence keys parsed from Orthocaller entries.
+
+    Returns:
+        Tuple of:
+            - list of matching (header, sequence) records
+            - dictionary tracking whether each target key was seen
+    """
     seen = {k: False for k in target_keys}
     matches = []
 
@@ -140,6 +278,14 @@ def collect_matches(fasta_path: Path, target_keys: List[str]) -> Tuple[List[Tupl
 
 
 def write_fasta_record(handle, header: str, seq: str):
+    """
+    Write one FASTA record to an open file handle.
+
+    Args:
+        handle: Open writable file handle.
+        header: FASTA header without leading ">".
+        seq: Sequence string.
+    """
     handle.write(f">{header}\n")
 
     for i in range(0, len(seq), 60):
@@ -147,6 +293,20 @@ def write_fasta_record(handle, header: str, seq: str):
 
 
 def main():
+    """
+    Run the Orthocaller-to-GeneRax sequence extraction workflow.
+
+    For each target orthogroup:
+        1) Locate the Orthocaller orthogroup CSV.
+        2) Read selected sequence entries.
+        3) Find the corresponding GeneRax alignment FASTA.
+        4) Extract matching FASTA records.
+        5) Write per-OG FASTAs or one combined FASTA.
+        6) Write an extraction report.
+
+    If --strict is set, missing files or missing sequence keys stop the run.
+    Otherwise, errors are recorded in the report and processing continues.
+    """
     ap = argparse.ArgumentParser(
         description="Extract Orthocaller-selected protein sequences from GeneRax alignment FASTAs."
     )
@@ -277,3 +437,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```

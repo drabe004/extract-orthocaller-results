@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+"""
+Remove failed sequences listed in frameFAIL CSV files from matching CDS and
+protein FASTA files.
+
+The script reads one or more *.frameFAIL.csv files, extracts failed translated
+and original sequence IDs, removes matching records from protein and CDS FASTAs,
+and writes sifted FASTA outputs to new directories.
+"""
 
 import argparse
 import csv
@@ -12,6 +20,9 @@ FASTA_EXTS_DEFAULT = [".fa", ".faa", ".fasta", ".fas", ".fna"]
 
 
 def parse_args():
+    """
+    Parse command-line arguments for frame-failure sequence removal.
+    """
     p = argparse.ArgumentParser(
         description="Remove failed sequences (from frameFAIL CSVs) from matching CDS and protein FASTAs, writing to new dirs."
     )
@@ -41,6 +52,9 @@ def parse_args():
 
 
 def record_matches_id(record, target_id: str) -> bool:
+    """
+    Check whether a FASTA record matches a target sequence ID.
+    """
     # match record.id, record.name, or substring of description
     if record.id == target_id:
         return True
@@ -51,6 +65,9 @@ def record_matches_id(record, target_id: str) -> bool:
 
 
 def find_matching_fasta(base_stem: str, search_dir: Path, fasta_exts: List[str]) -> Optional[Path]:
+    """
+    Find the FASTA file that corresponds to a frameFAIL CSV basename.
+    """
     # exact stem + ext
     for ext in fasta_exts:
         cand = search_dir / f"{base_stem}{ext}"
@@ -65,6 +82,9 @@ def find_matching_fasta(base_stem: str, search_dir: Path, fasta_exts: List[str])
 
 
 def load_fail_ids(fail_csv: Path, remove_if_passes_is: str) -> Tuple[Set[str], Set[str]]:
+    """
+    Load translated and original sequence IDs that should be removed.
+    """
     translated_remove: Set[str] = set()
     original_remove: Set[str] = set()
     target = remove_if_passes_is.strip().upper()
@@ -88,6 +108,9 @@ def load_fail_ids(fail_csv: Path, remove_if_passes_is: str) -> Tuple[Set[str], S
 
 
 def sift_fasta(in_fa: Path, out_fa: Path, remove_ids: Set[str], dry_run: bool) -> Tuple[int, int]:
+    """
+    Remove matching records from a FASTA file and write the remaining records.
+    """
     kept = 0
     removed = 0
     records_out = []
@@ -107,10 +130,16 @@ def sift_fasta(in_fa: Path, out_fa: Path, remove_ids: Set[str], dry_run: bool) -
 
 
 def is_fasta(p: Path, fasta_exts: List[str]) -> bool:
+    """
+    Check whether a path is a FASTA file with an accepted extension.
+    """
     return p.is_file() and p.suffix.lower() in set([e.lower() for e in fasta_exts])
 
 
 def copy_if_missing(in_file: Path, out_dir: Path, dry_run: bool):
+    """
+    Copy a file to an output directory if it is not already present.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / in_file.name
     if out_file.exists():
@@ -121,6 +150,9 @@ def copy_if_missing(in_file: Path, out_dir: Path, dry_run: bool):
 
 
 def get_csv_list(args) -> List[Path]:
+    """
+    Collect frameFAIL CSV files matching the requested pattern.
+    """
     csvs = list(args.fail_csv_dir.glob(args.pattern))
     if args.sort_csvs:
         csvs = sorted(csvs)
@@ -128,6 +160,9 @@ def get_csv_list(args) -> List[Path]:
 
 
 def main():
+    """
+    Run the frame-failure sequence removal workflow.
+    """
     args = parse_args()
 
     # Determine which CSV(s) to process

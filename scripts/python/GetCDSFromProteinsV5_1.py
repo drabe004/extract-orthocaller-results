@@ -1,5 +1,28 @@
+```python
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+"""
+Extract CDS sequences corresponding to protein FASTA records using exact,
+reconstructed, and species-aware ID matching.
+
+This script takes protein FASTA records, identifies the species and mangled
+sequence identifier embedded in each protein header, finds the matching CDS
+record from species-specific CDS FASTA files, and writes recovered CDS
+sequences to output FASTA files.
+
+Major features:
+    1) Supports Ensembl, NCBI, FUNannotate, and garbled/mangled ID patterns.
+    2) Uses species_mapping.json as the main species-to-CDS source.
+    3) Optionally overrides CDS filenames using a species CSV.
+    4) Resolves ambiguous matches using translated CDS amino acid agreement.
+    5) Optionally uses original Ensembl protein FASTAs to recover transcript IDs.
+    6) Writes no-match logs and ambiguity-resolution logs.
+
+Typical use:
+    Recover CDS sequences matching protein alignments for PAL2NAL, HyPhy,
+    selection tests, and downstream comparative genomics workflows.
+"""
 
 from Bio.Seq import Seq
 from Bio.Data import CodonTable
@@ -38,6 +61,9 @@ STD_TABLE = CodonTable.unambiguous_dna_by_id[1]  # vertebrate nuclear
 GENE_FIELD = re.compile(r'\bgene:(' + ENSEMBL_GENE_ID.pattern + r')\b', re.IGNORECASE)
 
 def strip_ens_ver_upper(s: str) -> str:
+    """
+    Strip Ensembl version suffixes and uppercase the ID.
+    """
     return strip_ens_version((s or '').upper())
 
 def extract_ensembl_gene_from_cds_header(raw_header: str) -> Optional[str]:
@@ -155,9 +181,15 @@ def translate_cds(nt: str) -> str:
     return pep[:-1] if pep.endswith("*") else pep
 
 def aa_clean(seq: str) -> str:
+    """
+    Clean an amino acid sequence by uppercasing and keeping only A-Z letters.
+    """
     return re.sub(r'[^A-Z]', '', (seq or '').upper())
 
 def aa_identity(a: str, b: str) -> float:
+    """
+    Compute simple amino acid identity normalized by the longer sequence length.
+    """
     if not a or not b:
         return 0.0
     L = min(len(a), len(b))
@@ -167,20 +199,37 @@ def aa_identity(a: str, b: str) -> float:
     return matches / max(len(a), len(b))
 
 def det_choice(items, seed_key: str):
+    """
+    Deterministically choose one item from a collection using an MD5-derived seed.
+
+    This avoids run-to-run randomness while still breaking ties in a stable way.
+    """
     seed = int(hashlib.md5(seed_key.encode()).hexdigest(), 16) % (2**32)
     rng = random.Random(seed)
     return rng.choice(list(items))
 
 def strip_ens_version(s: str) -> str:
+    """
+    Remove a trailing Ensembl-style version suffix from an ID.
+    """
     return ENSEMBL_VERSION.sub('', s)
 
 def canonize_header(h: str) -> str:
+    """
+    Normalize a header/column name for flexible matching.
+    """
     return re.sub(r'[\s_]+', '', h.strip().lower())
 
 def normalize_headers(headers: List[str]) -> Dict[str, str]:
+    """
+    Build a map from normalized header names to original header names.
+    """
     return {canonize_header(h): h for h in headers}
 
 def pick_header(name_map: Dict[str, str], wanted_aliases: set) -> Optional[str]:
+    """
+    Pick a CSV header from normalized aliases.
+    """
     wanted = {canonize_header(x) for x in wanted_aliases}
     for k, v in name_map.items():
         if k in wanted:
@@ -188,19 +237,41 @@ def pick_header(name_map: Dict[str, str], wanted_aliases: set) -> Optional[str]:
     return None
 
 def open_maybe_gzip(p: Path):
+    """
+    Open plain text or gzipped text files transparently.
+    """
     return gzip.open(p, "rt") if str(p).endswith(".gz") else p.open("r", encoding="utf-8", errors="replace")
 
 def symbol_from_filename(p: Path) -> Optional[str]:
+    """
+    Extract the gene symbol embedded in a protein FASTA filename.
+
+    Expected pattern:
+        __GENESYMBOL__
+    """
     m = SYMBOL_FROM_FILENAME.search(p.name)
     return m.group(1) if m else None
 
 def norm_simple(s: str) -> str:
+    """
+    Normalize an identifier by removing non-alphanumeric characters and uppercasing.
+    """
     return ALNUM.sub('', s).upper()
 
 # =========================
 # Read CSV map (optional)
 # =========================
 def read_species_to_cds_map(csv_path: Path) -> Dict[str, str]:
+    """
+    Read an optional species-to-CDS filename map from CSV.
+
+    The CSV must include a CDS column and either:
+        - Species Name From Tree No Underscores
+        - Species Name From Tree
+
+    Returns:
+        Dictionary mapping species key to CDS filename.
+    """
     mapping: Dict[str, str] = {}
     with csv_path.open(newline='', encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
@@ -232,6 +303,14 @@ def read_species_to_cds_map(csv_path: Path) -> Dict[str, str]:
 # Find CDS file
 # =========================
 def find_cds_path(cds_dir: Path, csv_value: str) -> Optional[Path]:
+    """
+    Locate a CDS FASTA file in cds_dir using a mapped CSV/JSON filename value.
+
+    Tries the exact basename, gzipped form, and common .fa/.fna alternatives.
+
+    Returns:
+        First existing candidate path, or None.
+    """
     candidates = []
     def add(p: Path):
         if p.exists():
@@ -270,17 +349,39 @@ def parse_species_prefix_and_mangled(header: str, symbol: str) -> Tuple[str, str
 # Exact index (no fuzzy)
 # =========================
 class FastaExactIndex:
+    """
+    Exact-match lookup index for FASTA headers.
+
+    Attributes:
+        path: Source FASTA path.
+        id_map: Dictionary mapping extracted identifier keys to raw FASTA headers.
+    """
     __slots__ = ("path", "id_map")
     def __init__(self, path: Path):
         self.path = path
         self.id_map: Dict[str, List[str]] = {}
 
 def add_key(idx: FastaExactIndex, key: str, raw: str):
+    """
+    Add an identifier key to a FASTA index, avoiding duplicate raw headers.
+    """
     lst = idx.id_map.setdefault(key, [])
     if raw not in lst:
         lst.append(raw)
 
 def index_fasta_exact(fa_path: Path) -> FastaExactIndex:
+    """
+    Build an exact identifier index from FASTA headers.
+
+    Extracts multiple possible ID forms from each header, including:
+        - NCBI protein_id fields
+        - Ensembl gene and transcript IDs
+        - NCBI-like accessions
+        - FUNannotate IDs
+
+    Returns:
+        FastaExactIndex for exact lookup.
+    """
     idx = FastaExactIndex(fa_path)
     with open_maybe_gzip(fa_path) as fh:
         for line in fh:
@@ -333,6 +434,9 @@ def index_fasta_exact(fa_path: Path) -> FastaExactIndex:
 _FAM_RX = re.compile(r'^(XP|XM|NP|YP|WP)_\d+\.\d+$')
 
 def _present_families(idx: FastaExactIndex) -> set:
+    """
+    Identify which NCBI accession families are present in a FASTA index.
+    """
     fams = set()
     for k in idx.id_map.keys():
         m = _FAM_RX.match(k)
@@ -344,6 +448,11 @@ def _present_families(idx: FastaExactIndex) -> set:
 # Reconstruction helpers (from mangled)
 # =========================
 def reconstruct_ncbi_prefixed(garble: str, clazz: str) -> List[str]:
+    """
+    Reconstruct possible NCBI prefixed accessions from a garbled identifier.
+
+    Example families include XP, XM, NP, YP, and WP.
+    """
     out: List[str] = []
     clazz = clazz.upper()
     last_letter = clazz[-1]
@@ -370,6 +479,9 @@ def reconstruct_ncbi_prefixed(garble: str, clazz: str) -> List[str]:
     return uniq
 
 def reconstruct_ncbi_acc(garble: str) -> List[str]:
+    """
+    Reconstruct possible bare NCBI/WGS-style accessions from a garbled ID.
+    """
     out: List[str] = []
     G = norm_simple(garble)
     if not G or not re.match(r'^[A-Z0-9]+$', G):
@@ -396,6 +508,9 @@ def reconstruct_ncbi_acc(garble: str) -> List[str]:
     return uniq
 
 def reconstruct_fun(garble: str) -> List[str]:
+    """
+    Reconstruct possible FUNannotate-style IDs from a garbled ID.
+    """
     t = garble.upper()
     m = re.match(r'^FUN(\d+)-T(\d+)$', t)
     if m:
@@ -412,6 +527,17 @@ def reconstruct_fun(garble: str) -> List[str]:
     return [norm_simple(t)]
 
 def rebuilt_candidates_from_mangled(mangled: str, scheme: Dict[str, Any]) -> List[str]:
+    """
+    Build possible exact-match lookup keys from a mangled protein-header ID.
+
+    The reconstruction strategy depends on the species scheme:
+        - ncbi
+        - fun
+        - ens_only
+
+    Returns:
+        Ordered, de-duplicated list of candidate keys.
+    """
     cands: List[str] = []
     stype = (scheme.get("type") or "").lower()
     clazz = (scheme.get("class") or "").upper()
@@ -496,6 +622,9 @@ def rebuilt_candidates_from_mangled(mangled: str, scheme: Dict[str, Any]) -> Lis
 
 # ---- conservative rescues ----
 def _first_letter_rescue(idx: FastaExactIndex, candidate: str) -> List[str]:
+    """
+    Attempt a conservative accession rescue by matching after the first letter.
+    """
     if '.' not in candidate or len(candidate) < 6:
         return []
     protein_keys = [k for k in idx.id_map.keys() if re.match(r'^[A-Z]{3}\d+\.\d+$', k)]
@@ -505,6 +634,9 @@ def _first_letter_rescue(idx: FastaExactIndex, candidate: str) -> List[str]:
     return []
 
 def _unique_substring_fallback(idx: FastaExactIndex, candidates: List[str]) -> Tuple[List[str], Optional[str]]:
+    """
+    Attempt a conservative fallback where a candidate occurs in exactly one key.
+    """
     if not candidates:
         return [], None
     keys = list(idx.id_map.keys())
@@ -522,6 +654,16 @@ def try_exact_match(idx: FastaExactIndex,
                     mangled: str,
                     scheme: Dict[str, Any],
                     dbg_emitter=None) -> Tuple[List[str], List[str]]:
+    """
+    Try to match a protein-header-derived mangled ID to exact CDS headers.
+
+    Candidate keys are reconstructed from the mangled ID and filtered to avoid
+    unsafe matches. Exact canonical keys are tried first, followed by normalized
+    keys and conservative rescue methods.
+
+    Returns:
+        hits, tried_keys
+    """
     tried: List[str] = []
     can_keys: List[str] = []
     norm_keys: List[str] = []
@@ -579,6 +721,9 @@ def try_exact_match(idx: FastaExactIndex,
 # IO helpers
 # =========================
 def extract_sequence_at_header(fa_path: Path, target_header: str) -> str:
+    """
+    Extract the sequence associated with one exact FASTA header.
+    """
     seq_lines = []
     capture = False
     with open_maybe_gzip(fa_path) as fh:
@@ -593,20 +738,38 @@ def extract_sequence_at_header(fa_path: Path, target_header: str) -> str:
     return "".join(seq_lines)
 
 def seq_len_for_header(fa_path: Path, target_header: str) -> int:
+    """
+    Return the sequence length for one exact FASTA header.
+    """
     return len(extract_sequence_at_header(fa_path, target_header))
 
 def wrap(seq: str, width: int = 60) -> str:
+    """
+    Wrap a sequence string to fixed-width FASTA lines.
+    """
     return "\n".join(seq[i:i+width] for i in range(0, len(seq), width))
 
 def out_name_for(protein_faa: Path, out_dir: Optional[Path], suffix: str = "_CDS.fasta") -> Path:
+    """
+    Build the output CDS FASTA path for a protein FASTA.
+    """
     name = protein_faa.name + suffix
     return (out_dir / name) if out_dir else protein_faa.with_name(name)
 
 def ambcalls_name_for(protein_faa: Path, ambcalls_dir: Optional[Path], out_dir: Optional[Path], suffix: str = ".ambcalls.tsv") -> Path:
+    """
+    Build the ambiguity-call log path for a protein FASTA.
+    """
     base_dir = ambcalls_dir or out_dir or protein_faa.parent
     return base_dir / (protein_faa.name + suffix)
 
 def iter_fasta(fp):
+    """
+    Iterate through FASTA records from an open file handle.
+
+    Yields:
+        header, sequence
+    """
     hdr = None
     buf = []
     for line in fp:
@@ -624,6 +787,12 @@ def iter_fasta(fp):
 # Ensembl orig-protein indexing (NEW)
 # =========================
 def extract_ids_from_header_text(raw_header: str) -> Tuple[List[str], List[str]]:
+    """
+    Extract Ensembl gene and transcript IDs from a header.
+
+    Returns:
+        genes, transcripts
+    """
     genes = [strip_ens_version(m.group(0)).upper() for m in ENSEMBL_GENE_ID.finditer(raw_header)]
     txs   = [strip_ens_version(m.group(0)).upper() for m in ENSEMBL_TX_ID.finditer(raw_header)]
     # dedup preserving order
@@ -646,6 +815,12 @@ def _species_key_variants_from_filename(fname_stem: str) -> Tuple[str, str]:
     return sp, sp.replace('_','')
 
 class OrigProtIndex:
+    """
+    Index of original protein FASTA records for Ensembl ambiguity resolution.
+
+    Stores protein records by amino acid MD5, gene ID, transcript ID, and full
+    header-to-sequence mapping.
+    """
     __slots__ = ("path", "by_aa_md5", "by_gene", "by_tx", "header_to_seq")
     def __init__(self, path: Path):
         self.path = path
@@ -655,6 +830,9 @@ class OrigProtIndex:
         self.header_to_seq: Dict[str, str] = {}
 
 def _add_map_list(d: Dict[str, List[str]], k: str, h: str):
+    """
+    Add a header to a list-valued dictionary key without duplication.
+    """
     if not k:
         return
     lst = d.setdefault(k, [])
@@ -662,6 +840,9 @@ def _add_map_list(d: Dict[str, List[str]], k: str, h: str):
         lst.append(h)
 
 def index_original_proteins(prot_path: Path) -> OrigProtIndex:
+    """
+    Index an original protein FASTA file for Ensembl gene/transcript recovery.
+    """
     opi = OrigProtIndex(prot_path)
     with open_maybe_gzip(prot_path) as fh:
         for hdr, seq in iter_fasta(fh):
@@ -700,6 +881,9 @@ def build_species_to_origprot(orig_dir: Path):
             SPECIES_TO_ORIGPROT.setdefault(species_no_us, p)
 
 def filter_ensembl_gene_candidates(keys: List[str]) -> List[str]:
+    """
+    Filter a list to unique Ensembl gene IDs with versions stripped.
+    """
     out = []
     seen = set()
     for k in keys:
@@ -786,6 +970,17 @@ def resolve_by_aa_len_then_detpick(
     og_key: str,
     prot_header: str,
 ):
+    """
+    Resolve ambiguous CDS candidates using translated amino acid agreement.
+
+    Priority:
+        1) Exact amino acid match to the target protein, if available.
+        2) Longest translated amino acid sequence.
+        3) Deterministic tie-break among remaining candidates.
+
+    Returns:
+        chosen_candidate, reason, number_tied, other_candidates
+    """
     for c in candidates:
         if 'aa_seq' not in c or c['aa_seq'] is None:
             nt = c.get('cds_seq', '')
@@ -806,12 +1001,21 @@ def resolve_by_aa_len_then_detpick(
 
 # --- Ambiguity logging helpers (NEW) ---
 def _md5(s: str) -> str:
+    """
+    Return MD5 hash for a string.
+    """
     return hashlib.md5((s or "").encode()).hexdigest()
 
 def _join(xs):
+    """
+    Join a list-like object using semicolons for TSV logging.
+    """
     return ";".join(xs) if xs else ""
 
 def _lens(xs):
+    """
+    Join numeric lengths using semicolons for TSV logging.
+    """
     return ";".join(str(x) for x in xs) if xs else ""
 
 def log_ambcall(
@@ -863,6 +1067,20 @@ def process_one_file(
     debug: bool = False,
     orig_proteins_dir: Optional[Path] = None,   # <-- NEW
 ) -> Tuple[int,int,int,Optional[Path],Optional[Path],Optional[Path]]:
+    """
+    Process one protein FASTA/alignment and extract matching CDS records.
+
+    For each protein record:
+        1) Parse species key and mangled ID.
+        2) Locate the species-specific CDS FASTA.
+        3) Reconstruct candidate IDs and look for exact CDS header matches.
+        4) Resolve missing/ambiguous matches using configured fallbacks.
+        5) Write recovered CDS sequence to output FASTA.
+        6) Log unresolved or ambiguous cases.
+
+    Returns:
+        unamb_matched, resolved_ambig, total, out_path, ambcalls_path, nomatch_path
+    """
 
     scheme_lookup = scheme_lookup or {}
     species_to_cds = species_to_cds or {}
@@ -1381,6 +1599,12 @@ def process_one_file(
     return unamb_matched, resolved_ambig, total, out_path, ambcalls_path, nomatch_path
 
 def resolve_ambig_by_longest(fa_path: Path, raw_headers: List[str]) -> Tuple[str, List[str], List[int]]:
+    """
+    Resolve ambiguous raw FASTA headers by choosing the longest sequence.
+
+    Returns:
+        chosen_header, other_headers, other_lengths
+    """
     if not raw_headers:
         raise ValueError("No headers to resolve.")
     if len(raw_headers) == 1:
@@ -1396,6 +1620,21 @@ def resolve_ambig_by_longest(fa_path: Path, raw_headers: List[str]) -> Tuple[str
 # CLI
 # =========================
 def main():
+    """
+    Parse command-line arguments and run CDS extraction.
+
+    Supports either:
+        - one protein FASTA via --proteins_fasta
+        - batch mode over --in_dir using --glob
+
+    Required metadata:
+        - --species_json maps species keys to CDS filenames and matching schemes.
+        - --cds_dir contains the actual CDS FASTA files.
+
+    Optional metadata:
+        - --species_csv can override CDS filenames.
+        - --orig_proteins_dir enables Ensembl transcript recovery.
+    """
     ap = argparse.ArgumentParser(
         description="Extract CDS sequences per protein using EXACT ID matches; resolves Ensembl multi-hits via original protein files."
     )
@@ -1505,3 +1744,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
