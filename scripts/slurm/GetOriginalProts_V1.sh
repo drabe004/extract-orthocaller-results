@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=6g
 #SBATCH --tmp=4g
-#SBATCH --mail-type=FAIL
+#SBATCH --mail-type=ALL
 
 ###############################################################################
 # Original Protein Sequence Recovery
@@ -38,7 +38,6 @@ exec > "${LOGDIR}/get_orig_prots_v1.${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
 # -------------------------------
 # Environment
 # -------------------------------
-module load compatibility/agate-centos7
 module load conda
 source activate orthocaller
 

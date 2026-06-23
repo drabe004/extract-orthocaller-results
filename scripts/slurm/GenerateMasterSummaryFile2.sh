@@ -33,7 +33,7 @@ module load python
 
 
 python GenerateMasterSummaryFile2.py \
-  -i ${BASE_DIR}/Orthocaller_Danielle/Orthocaller_Output_Dir/ \
+  -i ${BASE_DIR}/Orthocaller/Orthocaller_Output_Dir/ \
   -o master_summary_file.txt \
   --min-cavefish 3 \ ### Change to your species of choice
   --min-background 30  ## Change to your species of choice

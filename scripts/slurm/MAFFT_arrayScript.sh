@@ -5,7 +5,7 @@
 #SBATCH --mem=64G
 #SBATCH --time=30:00:00
 #SBATCH --array=1-4000
-#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-type=ALL
 #SBATCH -o logs/realign_%A_%a.out
 #SBATCH -e logs/realign_%A_%a.err
 

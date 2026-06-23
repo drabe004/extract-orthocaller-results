@@ -9,7 +9,6 @@
 
 
 
-module load compatibility/agate-centos7
 module load conda 
 source activate orthocaller
 
